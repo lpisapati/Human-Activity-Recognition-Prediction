@@ -1,0 +1,95 @@
+---
+title: "Human Activity Recognition Prediction"
+author: "Lalitha Sastry Pisapati"
+date: "14 February 2016"
+output: html_document
+---
+
+# Executive Summary
+Human Activity Recognition (HAR) is a project to access the exercise activity collected on 8 hours of activity of 4 healthy subjects. The site has been generous allowing us to use this resource for my analysis.
+The data has been downloaded from http://groupware.les.inf.puc-rio.br/har
+Collabrates: Wallace Ugulino, Eduardo Velloso and Hugo Fuks
+The goal of this project is to predict the manner in which they did the excercise.
+
+# Data Processing
+Set the seed to 12345 and download the CSV files
+```{r, echo = TRUE}
+library(caret)
+set.seed(12345)
+dTraining = read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+dTesting = read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+```
+Create data partition with 60-40 ratio and create training and testing data
+```{r, echo = TRUE}
+inTrain = createDataPartition(y=dTraining$classe,p=.6,list=FALSE)
+training = dTraining[inTrain,]
+testing = dTraining[-inTrain,]
+dim(training)
+dim(testing)
+```
+Remove non-zero data from the data
+```{r, echo = TRUE}
+trainingNZData = nearZeroVar(training,saveMetrics = TRUE)
+training = training[,trainingNZData$nzv==FALSE]
+training <- training[c(-1)]
+testingNZData = nearZeroVar(testing,saveMetrics = TRUE)
+testing = testing[,testingNZData$nzv==FALSE]
+dim(training)
+dim(testing)
+```
+Remove data that has more NA 
+```{r, echo = TRUE}
+trainingMostlyNAData <- sapply(training, function(x) mean(is.na(x))) > 0.6
+training = training[,trainingMostlyNAData==FALSE]
+testingMostlyNAData <- sapply(testing, function(x) mean(is.na(x))) > 0.6
+testing = testing[,testingMostlyNAData==FALSE]
+dim(training)
+dim(testing)
+```
+Remove non-numeric colomns. Technically let's consider only those that are used for prediction
+```{r, echo = TRUE}
+training = training[,-(1:5)]
+testing = testing[,-(1:5)]
+trainingColName = colnames(training)
+testing = testing[trainingColName]
+dim(training)
+dim(testing)
+```
+
+# Prediction using decision tree
+```{r, echo = TRUE}
+# decision tree
+library(rpart)
+#library(rpart.plot)
+library(rattle)
+modRpart = rpart(classe ~ ., data = training, method = "class")
+fancyRpartPlot(modRpart)
+```
+
+```{r, echo = TRUE}
+predictRpart = predict(modRpart,testing, type = "class")
+cmRpart = confusionMatrix(predictRpart,testing$classe)
+round(cmRpart$overall['Accuracy'], 4)
+```
+
+# Prediction using ranom forest
+```{r, echo = TRUE}
+library(randomForest)
+#random forest
+modRf = randomForest(classe ~ ., data = training)
+predictRf = predict(modRf,testing, type = "class")
+cmRf = confusionMatrix(predictRf,testing$classe)
+round(cmRf$overall['Accuracy'], 4)
+plot(modRf)
+```
+
+# Conclusions
+Random Forest accuracy is 99.89% compared to other prediction algorithms. So, the error sample would be 0.11%
+```{r, echo = TRUE}
+finalP = predict(modRf, newdata=testing)
+finalP[c(1,1:20)]
+```
+
+```{r echo = FALSE, results="hide"}
+rm(finalP, dTraining, dTesting, inTrain, training, testing, trainingNZData, testingNZData, trainingMostlyNAData, testingMostlyNAData, trainingColName, modRpart, predictRpart, cmRpart, modRf, predictRf, cmRf)
+```
